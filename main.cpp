@@ -5,31 +5,13 @@
 #include "include/sqlite3.h"
 
 // Callback function for querying the database
-static int callback(void* data, int argc, char** argv, char** azColName) {
-    static bool headersPrinted = false; // Track whether headers are already printed
-
-    if (!headersPrinted) {
-        std::cout << std::left << std::setw(8) << "ID";
-        std::cout << " | ";
-        std::cout << std::left << std::setw(24) << "Title";
-        std::cout << " | ";
-        std::cout << std::left << std::setw(16) << "Author" << "\n";
-
-        std::cout << std::setfill('=') << std::setw(8) << ""
-                  << "=";
-        std::cout << std::setw(26) << ""
-                  << "=";
-        std::cout << std::setw(18) << "" << "\n";
-        std::cout << std::setfill(' ');
-
-        headersPrinted = true;
-    }
-
+static int callback(void *data, int argc, char **argv, char **azColName) {
     for (int i = 0; i < argc; i++) {
         if (i > 0) {
             std::cout << " | ";
         }
-        std::cout << std::left << std::setw(i == 1 ? 24 : (i == 2 ? 16 : 8)) << (argv[i] ? argv[i] : "NULL");
+        std::cout << std::left << std::setw(i == 1 ? 24 : (i == 2 ? 16 : 8))
+                  << (argv[i] ? argv[i] : "NULL");
     }
     std::cout << "\n";
     return 0;
@@ -133,6 +115,22 @@ int main() {
                 // View all books in the database with the selected sorting criteria and order
                 std::string selectSQL
                     = "SELECT * FROM books ORDER BY " + orderBy + " " + sortOrder + ";";
+
+                std::cout << std::left << std::setw(8) << "ID";
+                std::cout << " | ";
+                std::cout << std::left << std::setw(24) << "Title";
+                std::cout << " | ";
+                std::cout << std::left << std::setw(16) << "Author"
+                          << "\n";
+
+                std::cout << std::setfill('=') << std::setw(8) << ""
+                          << "=";
+                std::cout << std::setw(26) << ""
+                          << "=";
+                std::cout << std::setw(18) << ""
+                          << "\n";
+                std::cout << std::setfill(' ');
+
                 rc = sqlite3_exec(db, selectSQL.c_str(), callback, 0, &zErrMsg);
 
                 if (rc != SQLITE_OK) {
