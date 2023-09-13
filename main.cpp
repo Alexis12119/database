@@ -71,7 +71,7 @@ void writeToLog(LogLevel level, const std::string& message) {
     logFile << "[" << levelStr << "] " << message << std::endl;
 }
 
-// Class to manage SQLite database connection with RAII
+// Class to manage SQLite database connection with RAII(Resource Acquisition Is Initialization)
 class DatabaseConnection {
    private:
     sqlite3* db;
