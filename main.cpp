@@ -11,13 +11,15 @@ const int MENU_ADD_BOOK = 1;
 const int MENU_VIEW_BOOKS = 2;
 const int MENU_DELETE_BOOK = 3;
 const int MENU_SEARCH_BOOK = 4;
-const int MENU_QUIT = 5;
+const int MENU_UPDATE_BOOK = 5;
+const int MENU_QUIT = 6;
 
 void displayMenu();
 void addBook(sqlite3* db);
 void viewBooks(sqlite3* db);
 void searchBooks(sqlite3* db);
 void deleteBook(sqlite3* db);
+void updateBook(sqlite3* db);
 void handleSqliteError(sqlite3* db, const char* operation);
 bool checkIfExists(sqlite3* db, int bookId);
 
@@ -94,6 +96,10 @@ int main() {
             case MENU_SEARCH_BOOK:
                 searchBooks(db);
                 break;
+
+            case MENU_UPDATE_BOOK:
+                updateBook(db);
+                break;
             case MENU_QUIT:
                 // Close the database and exit
                 return 0;
@@ -115,7 +121,8 @@ void displayMenu() {
     std::cout << "2. View all books\n";
     std::cout << "3. Delete a book\n";
     std::cout << "4. Search a book\n";
-    std::cout << "5. Quit\n";
+    std::cout << "5. Update a book\n";
+    std::cout << "6. Quit\n";
     std::cout << "Enter your choice: ";
 }
 
@@ -358,6 +365,89 @@ void deleteBook(sqlite3* db) {
     } else {
         std::cout << "Deletion canceled.\n";
     }
+}
+
+// Function to update a book in the database
+void updateBook(sqlite3* db) {
+    std::string bookId;
+    std::cout << "Enter the ID of the book you want to update: ";
+    std::cin >> bookId;
+
+    // Check if the input is a valid integer
+    if (!std::all_of(bookId.begin(), bookId.end(), ::isdigit)) {
+        std::cout << "Please enter a valid integer: ";
+        std::cin >> bookId;
+    }
+
+    // Check if the book with the specified ID exists
+    if (!checkIfExists(db, std::stoi(bookId))) {
+        std::cout << "Book with ID " << bookId << " does not exist in the database.\n";
+        return;
+    }
+
+    // Retrieve the current title and author information based on the book ID
+    std::string currentTitle, currentAuthor;
+    const char* selectSQL = "SELECT title, author FROM books WHERE id = ?;";
+    sqlite3_stmt* selectStmt;
+
+    int rc = sqlite3_prepare_v2(db, selectSQL, -1, &selectStmt, nullptr);
+    if (rc != SQLITE_OK) {
+        handleSqliteError(db, "prepare statement");
+        return;
+    }
+
+    sqlite3_bind_int(selectStmt, 1, std::stoi(bookId));
+
+    rc = sqlite3_step(selectStmt);
+    if (rc == SQLITE_ROW) {
+        currentTitle = reinterpret_cast<const char*>(sqlite3_column_text(selectStmt, 0));
+        currentAuthor = reinterpret_cast<const char*>(sqlite3_column_text(selectStmt, 1));
+    }
+
+    sqlite3_finalize(selectStmt);
+
+    std::string newTitle, newAuthor;
+    std::cout
+        << "Enter the new title of the book (or press Enter to keep it unchanged, current title: "
+        << currentTitle << "): ";
+    std::cin.ignore();
+    std::getline(std::cin, newTitle);
+
+    if (newTitle.empty()) {
+        newTitle = currentTitle;  // Keep the current title if the user presses Enter
+    }
+
+    std::cout
+        << "Enter the new author of the book (or press Enter to keep it unchanged, current author: "
+        << currentAuthor << "): ";
+    std::getline(std::cin, newAuthor);
+
+    if (newAuthor.empty()) {
+        newAuthor = currentAuthor;  // Keep the current author if the user presses Enter
+    }
+
+    // Use parameterized query to update the book
+    const char* updateSQL = "UPDATE books SET title = ?, author = ? WHERE id = ?;";
+    sqlite3_stmt* updateStmt;
+
+    rc = sqlite3_prepare_v2(db, updateSQL, -1, &updateStmt, nullptr);
+    if (rc != SQLITE_OK) {
+        handleSqliteError(db, "prepare statement");
+        return;
+    }
+
+    sqlite3_bind_text(updateStmt, 1, newTitle.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(updateStmt, 2, newAuthor.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_int(updateStmt, 3, std::stoi(bookId));
+
+    rc = sqlite3_step(updateStmt);
+    if (rc != SQLITE_DONE) {
+        handleSqliteError(db, "execute statement");
+    } else {
+        std::cout << "Book updated successfully.\n";
+    }
+
+    sqlite3_finalize(updateStmt);
 }
 
 bool checkIfExists(sqlite3* db, int bookId) {
