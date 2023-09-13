@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <string>
 
 #include "include/sqlite3.h"
@@ -23,6 +24,7 @@ void deleteBook(sqlite3* db);
 void updateBook(sqlite3* db);
 void handleSqliteError(sqlite3* db, const char* operation);
 bool checkIfExists(sqlite3* db, int bookId);
+int getValidIntegerInput();
 
 // Callback function for querying the database
 static int callback(void* data, int argc, char** argv, char** azColName) {
@@ -113,8 +115,7 @@ int main() {
         while (true) {
             displayMenu();
 
-            int choice;
-            std::cin >> choice;
+            int choice = getValidIntegerInput();
 
             switch (choice) {
             case MENU_ADD_BOOK:
@@ -148,6 +149,11 @@ int main() {
                 break;
             }
         }
+        // Close the log file
+        logFile.close();
+
+        // Close the database and exit
+        return 0;
     } catch (const std::exception& e) {
         std::cerr << "An error occurred: " << e.what() << "\n";
         // Close the log file
@@ -238,8 +244,7 @@ void viewBooks(sqlite3* db) {
     std::cout << "2. Sort by Author\n";
     std::cout << "Enter your choice: ";
 
-    int sortChoice;
-    std::cin >> sortChoice;
+    int sortChoice = getValidIntegerInput();
 
     std::string orderBy;
 
@@ -262,8 +267,7 @@ void viewBooks(sqlite3* db) {
         std::cout << "2. Descending\n";
         std::cout << "Enter your choice: ";
 
-        int sortOrderChoice;
-        std::cin >> sortOrderChoice;
+        int sortOrderChoice = getValidIntegerInput();
 
         std::string sortOrder
             = (sortOrderChoice == 2) ? "DESC" : "ASC";  // Default to ascending for other choices
@@ -296,7 +300,7 @@ void viewBooks(sqlite3* db) {
     }
 }
 
-// Function to search for books by title or author
+// Function to search for books by title or author with parameterized query
 void searchBooks(sqlite3* db) {
     while (true) {
         std::string searchTerm;
@@ -304,10 +308,21 @@ void searchBooks(sqlite3* db) {
         std::cin.ignore();
         std::getline(std::cin, searchTerm);
 
-        // Construct a SQL query to search for books
-        std::string searchSQL = "SELECT * FROM books WHERE title LIKE '%" + searchTerm
-                                + "%' OR author LIKE '%" + searchTerm + "%';";
+        // Construct a SQL query to search for books with parameterized query
+        const char* searchSQL = "SELECT * FROM books WHERE title LIKE ? OR author LIKE ?;";
+        sqlite3_stmt* stmt;
 
+        int rc = sqlite3_prepare_v2(db, searchSQL, -1, &stmt, nullptr);
+        if (rc != SQLITE_OK) {
+            handleSqliteError(db, "prepare statement");
+            return;
+        }
+
+        // Bind the search term to the parameter
+        sqlite3_bind_text(stmt, 1, ("%" + searchTerm + "%").c_str(), -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 2, ("%" + searchTerm + "%").c_str(), -1, SQLITE_STATIC);
+
+        // Display header
         std::cout << "Search Results:\n";
         std::cout << std::left << std::setw(8) << "ID";
         std::cout << " | ";
@@ -324,13 +339,23 @@ void searchBooks(sqlite3* db) {
                   << "\n";
         std::cout << std::setfill(' ');
 
-        char* zErrMsg = 0;
-        int rc = sqlite3_exec(db, searchSQL.c_str(), callback, 0, &zErrMsg);
-
-        if (rc != SQLITE_OK) {
-            std::cerr << "SQL error: " << zErrMsg << "\n";
-            sqlite3_free(zErrMsg);
+        // Step through the prepared statement and print results row by row
+        while ((rc = sqlite3_step(stmt)) == SQLITE_ROW) {
+            std::cout << std::left << std::setw(8) << sqlite3_column_int(stmt, 0);
+            std::cout << " | ";
+            std::cout << std::left << std::setw(24)
+                      << reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            std::cout << " | ";
+            std::cout << std::left << std::setw(16)
+                      << reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2)) << "\n";
         }
+
+        if (rc != SQLITE_DONE) {
+            handleSqliteError(db, "execute statement");
+        }
+
+        sqlite3_finalize(stmt);
+
         // Ask if the user wants to search again
         char tryAgain;
         std::cout << "\nDo you want to search again? (y/n): ";
@@ -343,15 +368,8 @@ void searchBooks(sqlite3* db) {
 
 // Function to delete a book from the database
 void deleteBook(sqlite3* db) {
-    std::string bookId;
     std::cout << "Enter the ID of the book you want to delete: ";
-    std::cin >> bookId;
-
-    // Check if the input is a valid integer
-    if (!std::all_of(bookId.begin(), bookId.end(), ::isdigit)) {
-        std::cout << "Please enter a valid integer: ";
-        std::cin >> bookId;
-    }
+    int bookId = getValidIntegerInput();
 
     // Retrieve the title and author information based on the book ID
     std::string title, author;
@@ -364,7 +382,7 @@ void deleteBook(sqlite3* db) {
         return;
     }
 
-    sqlite3_bind_int(selectStmt, 1, std::stoi(bookId));
+    sqlite3_bind_int(selectStmt, 1, bookId);
 
     rc = sqlite3_step(selectStmt);
     if (rc == SQLITE_ROW) {
@@ -394,7 +412,7 @@ void deleteBook(sqlite3* db) {
             return;
         }
 
-        sqlite3_bind_int(deleteStmt, 1, std::stoi(bookId));
+        sqlite3_bind_int(deleteStmt, 1, bookId);
 
         rc = sqlite3_step(deleteStmt);
         if (rc != SQLITE_DONE) {
@@ -411,18 +429,11 @@ void deleteBook(sqlite3* db) {
 
 // Function to update a book in the database
 void updateBook(sqlite3* db) {
-    std::string bookId;
     std::cout << "Enter the ID of the book you want to update: ";
-    std::cin >> bookId;
-
-    // Check if the input is a valid integer
-    if (!std::all_of(bookId.begin(), bookId.end(), ::isdigit)) {
-        std::cout << "Please enter a valid integer: ";
-        std::cin >> bookId;
-    }
+    int bookId = getValidIntegerInput();
 
     // Check if the book with the specified ID exists
-    if (!checkIfExists(db, std::stoi(bookId))) {
+    if (!checkIfExists(db, bookId)) {
         std::cout << "Book with ID " << bookId << " does not exist in the database.\n";
         return;
     }
@@ -438,7 +449,7 @@ void updateBook(sqlite3* db) {
         return;
     }
 
-    sqlite3_bind_int(selectStmt, 1, std::stoi(bookId));
+    sqlite3_bind_int(selectStmt, 1, bookId);
 
     rc = sqlite3_step(selectStmt);
     if (rc == SQLITE_ROW) {
@@ -480,7 +491,7 @@ void updateBook(sqlite3* db) {
 
     sqlite3_bind_text(updateStmt, 1, newTitle.c_str(), -1, SQLITE_STATIC);
     sqlite3_bind_text(updateStmt, 2, newAuthor.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_int(updateStmt, 3, std::stoi(bookId));
+    sqlite3_bind_int(updateStmt, 3, bookId);
 
     rc = sqlite3_step(updateStmt);
     if (rc != SQLITE_DONE) {
@@ -519,4 +530,16 @@ bool checkIfExists(sqlite3* db, int bookId) {
 
 void handleSqliteError(sqlite3* db, const char* operation) {
     std::cerr << "SQLite error during " << operation << ": " << sqlite3_errmsg(db) << "\n";
+}
+
+// Function to validate user input as an integer
+int getValidIntegerInput() {
+    int input;
+    while (!(std::cin >> input)) {
+        std::cin.clear();  // Clear the error flag
+        std::cin.ignore(std::numeric_limits<std::streamsize>::max(),
+                        '\n');  // Discard invalid input
+        std::cout << "Please enter a valid integer: ";
+    }
+    return input;
 }
