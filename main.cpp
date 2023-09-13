@@ -8,11 +8,13 @@
 const int MENU_ADD_BOOK = 1;
 const int MENU_VIEW_BOOKS = 2;
 const int MENU_DELETE_BOOK = 3;
-const int MENU_QUIT = 4;
+const int MENU_SEARCH_BOOK = 4;
+const int MENU_QUIT = 5;
 
 void displayMenu();
 void addBook(sqlite3* db);
 void viewBooks(sqlite3* db, int rc, char* zErrMsg);
+void searchBooks(sqlite3* db);
 void deleteBook(sqlite3* db);
 void handleSqliteError(sqlite3* db, const char* operation);
 
@@ -67,6 +69,9 @@ int main() {
         case MENU_DELETE_BOOK:
             deleteBook(db);
             break;
+        case MENU_SEARCH_BOOK:
+            searchBooks(db);
+            break;
         case MENU_QUIT:
             // Close the database and exit
             sqlite3_close(db);
@@ -84,7 +89,8 @@ void displayMenu() {
     std::cout << "1. Add a book\n";
     std::cout << "2. View all books\n";
     std::cout << "3. Delete a book\n";
-    std::cout << "4. Quit\n";
+    std::cout << "4. Search a book\n";
+    std::cout << "5. Quit\n";
     std::cout << "Enter your choice: ";
 }
 
@@ -182,6 +188,42 @@ void viewBooks(sqlite3* db, int rc, char* zErrMsg) {
             std::cerr << "SQL error: " << zErrMsg << "\n";
             sqlite3_free(zErrMsg);
         }
+    }
+}
+
+// Function to search for books by title or author
+void searchBooks(sqlite3* db) {
+    std::string searchTerm;
+    std::cout << "Enter search term (title or author): ";
+    std::cin.ignore();
+    std::getline(std::cin, searchTerm);
+
+    // Construct a SQL query to search for books
+    std::string searchSQL = "SELECT * FROM books WHERE title LIKE '%" + searchTerm
+                            + "%' OR author LIKE '%" + searchTerm + "%';";
+
+    std::cout << "Search Results:\n";
+    std::cout << std::left << std::setw(8) << "ID";
+    std::cout << " | ";
+    std::cout << std::left << std::setw(24) << "Title";
+    std::cout << " | ";
+    std::cout << std::left << std::setw(16) << "Author"
+              << "\n";
+
+    std::cout << std::setfill('=') << std::setw(8) << ""
+              << "=";
+    std::cout << std::setw(26) << ""
+              << "=";
+    std::cout << std::setw(18) << ""
+              << "\n";
+    std::cout << std::setfill(' ');
+
+    char* zErrMsg = 0;
+    int rc = sqlite3_exec(db, searchSQL.c_str(), callback, 0, &zErrMsg);
+
+    if (rc != SQLITE_OK) {
+        std::cerr << "SQL error: " << zErrMsg << "\n";
+        sqlite3_free(zErrMsg);
     }
 }
 
