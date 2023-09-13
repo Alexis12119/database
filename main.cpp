@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstring>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <string>
@@ -34,6 +35,38 @@ static int callback(void* data, int argc, char** argv, char** azColName) {
     }
     std::cout << "\n";
     return 0;
+}
+
+// Enum for log levels
+enum LogLevel { INFO, WARNING, ERROR, DEBUG };
+
+// Global log file
+std::ofstream logFile("book_management.log");
+
+// Function to write log messages
+void writeToLog(LogLevel level, const std::string& message) {
+    std::string levelStr;
+    switch (level) {
+    case INFO:
+        levelStr = "INFO";
+        break;
+    case WARNING:
+        levelStr = "WARNING";
+        break;
+    case ERROR:
+        levelStr = "ERROR";
+        break;
+    case DEBUG:
+        levelStr = "DEBUG";
+        break;
+    }
+
+    std::time_t now = std::time(nullptr);
+    struct tm localTime;
+    localtime_s(&localTime, &now);  // Windows-specific; use localtime() on other platforms
+
+    logFile << "[" << std::put_time(&localTime, "%Y-%m-%d %H:%M:%S") << "] ";
+    logFile << "[" << levelStr << "] " << message << std::endl;
 }
 
 // Class to manage SQLite database connection with RAII
@@ -85,22 +118,29 @@ int main() {
 
             switch (choice) {
             case MENU_ADD_BOOK:
+                writeToLog(INFO, "User selected to add a book.");
                 addBook(db);
                 break;
             case MENU_VIEW_BOOKS:
+                writeToLog(INFO, "User selected to view books.");
                 viewBooks(db);
                 break;
             case MENU_DELETE_BOOK:
+                writeToLog(INFO, "User selected to delete a book.");
                 deleteBook(db);
                 break;
             case MENU_SEARCH_BOOK:
+                writeToLog(INFO, "User selected to search for a book.");
                 searchBooks(db);
                 break;
-
             case MENU_UPDATE_BOOK:
+                writeToLog(INFO, "User selected to update a book.");
                 updateBook(db);
                 break;
             case MENU_QUIT:
+                writeToLog(INFO, "User selected to quit.");
+                // Close the log file
+                logFile.close();
                 // Close the database and exit
                 return 0;
             default:
@@ -110,6 +150,8 @@ int main() {
         }
     } catch (const std::exception& e) {
         std::cerr << "An error occurred: " << e.what() << "\n";
+        // Close the log file
+        logFile.close();
         return 1;
     }
 }
