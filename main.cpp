@@ -1,6 +1,8 @@
+#include <algorithm>
 #include <cstring>
 #include <iomanip>
 #include <iostream>
+#include <string>
 
 #include "include/sqlite3.h"
 
@@ -171,6 +173,7 @@ void addBook(sqlite3* db) {
             handleSqliteError(db, "execute statement");
         } else {
             std::cout << "Book added successfully.\n";
+            return;
         }
 
         sqlite3_finalize(stmt);
@@ -291,15 +294,41 @@ void searchBooks(sqlite3* db) {
 
 // Function to delete a book from the database
 void deleteBook(sqlite3* db) {
-    int bookId;
+    std::string bookId;
     std::cout << "Enter the ID of the book you want to delete: ";
     std::cin >> bookId;
 
-    // Check if the book with the specified ID exists
-    if (!checkIfExists(db, bookId)) {
-        std::cout << "Book with ID " << bookId << " does not exist in the database.\n";
+    // Check if the input is a valid integer
+    if (!std::all_of(bookId.begin(), bookId.end(), ::isdigit)) {
+        std::cout << "Please enter a valid integer: ";
+        std::cin >> bookId;
+    }
+
+    // Retrieve the title and author information based on the book ID
+    std::string title, author;
+    const char* selectSQL = "SELECT title, author FROM books WHERE id = ?;";
+    sqlite3_stmt* selectStmt;
+
+    int rc = sqlite3_prepare_v2(db, selectSQL, -1, &selectStmt, nullptr);
+    if (rc != SQLITE_OK) {
+        handleSqliteError(db, "prepare statement");
         return;
     }
+
+    sqlite3_bind_int(selectStmt, 1, std::stoi(bookId));
+
+    rc = sqlite3_step(selectStmt);
+    if (rc == SQLITE_ROW) {
+        title = reinterpret_cast<const char*>(sqlite3_column_text(selectStmt, 0));
+        author = reinterpret_cast<const char*>(sqlite3_column_text(selectStmt, 1));
+    }
+
+    sqlite3_finalize(selectStmt);
+
+    // Ask for confirmation before deleting the book
+    std::cout << "You are about to delete the following book:\n";
+    std::cout << "Title: " << title << "\n";
+    std::cout << "Author: " << author << "\n";
 
     char confirm;
     std::cout << "Are you sure you want to delete this book? (y/n): ";
@@ -310,13 +339,13 @@ void deleteBook(sqlite3* db) {
         const char* deleteSQL = "DELETE FROM books WHERE id = ?;";
         sqlite3_stmt* deleteStmt;
 
-        int rc = sqlite3_prepare_v2(db, deleteSQL, -1, &deleteStmt, nullptr);
+        rc = sqlite3_prepare_v2(db, deleteSQL, -1, &deleteStmt, nullptr);
         if (rc != SQLITE_OK) {
             handleSqliteError(db, "prepare statement");
             return;
         }
 
-        sqlite3_bind_int(deleteStmt, 1, bookId);
+        sqlite3_bind_int(deleteStmt, 1, std::stoi(bookId));
 
         rc = sqlite3_step(deleteStmt);
         if (rc != SQLITE_DONE) {
