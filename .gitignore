@@ -1,2 +1,5 @@
 *.exe
 *.log
+.cache/
+books.db
+compile_commands.json
