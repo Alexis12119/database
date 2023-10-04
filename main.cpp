@@ -6,7 +6,7 @@
 #include <limits>
 #include <string>
 
-#include "include/sqlite3.h"
+#include "sqlite3.h"
 
 // Constants for menu choices
 const int MENU_ADD_BOOK = 1;
