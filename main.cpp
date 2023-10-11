@@ -543,4 +543,3 @@ int getValidIntegerInput() {
     }
     return input;
 }
-
