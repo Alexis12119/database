@@ -22,7 +22,6 @@ AlwaysBreakTemplateDeclarations: No
 BreakBeforeBinaryOperators: true
 BreakBeforeTernaryOperators: true
 ContinuationIndentWidth: 4
-# AlignEscapedNewlines: DontAlign
 BinPackArguments: false
 SortIncludes: true
 Cpp11BracedListStyle: false
